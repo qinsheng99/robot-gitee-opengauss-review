@@ -25,6 +25,7 @@ type iClient interface {
 	GetRepoLabels(owner, repo string) ([]sdk.Label, error)
 	MergePR(owner, repo string, number int32, opt sdk.PullRequestMergePutParam) error
 	UpdatePullRequest(org, repo string, number int32, param sdk.PullRequestUpdateParam) (sdk.PullRequest, error)
+	ListPROperationLogs(org, repo string, number int32) ([]sdk.OperateLog, error)
 }
 
 func newRobot(cli iClient, cacheCli *cache.SDK) *robot {

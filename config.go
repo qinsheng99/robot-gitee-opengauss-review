@@ -90,6 +90,9 @@ type botConfig struct {
 	// MergeMethod is the method to merge PR.
 	// The default method of merge. Valid options are squash and merge.
 	MergeMethod pullRequestMergeMethod `json:"merge_method,omitempty"`
+
+	// LegalOperator is the person who can add labels
+	LegalOperator string `json:"legal_operator,omitempty"`
 }
 
 func (c *botConfig) setDefault() {
