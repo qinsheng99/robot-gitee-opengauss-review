@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	sdk "github.com/opensourceways/go-gitee/gitee"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,7 +30,12 @@ func (bot *robot) handleCheckPR(e *sdk.NoteEvent, cfg *botConfig) error {
 	pr := e.GetPullRequest()
 	org, repo := e.GetOrgRepo()
 
-	if r := canMerge(pr.Mergeable, e.GetPRLabelSet(), cfg); len(r) > 0 {
+	ops, err := bot.cli.ListPROperationLogs(org, repo, pr.GetNumber())
+	if err != nil {
+		return err
+	}
+
+	if r := canMerge(pr.Mergeable, e.GetPRLabelSet(), cfg, ops); len(r) > 0 {
 		return bot.cli.CreatePRComment(
 			org, repo, e.GetPRNumber(),
 			fmt.Sprintf(
@@ -51,12 +57,16 @@ func (bot *robot) tryMerge(e *sdk.PullRequestEvent, cfg *botConfig) error {
 	}
 
 	pr := e.PullRequest
+	org, repo := e.GetOrgRepo()
 
-	if r := canMerge(pr.GetMergeable(), e.GetPRLabelSet(), cfg); len(r) > 0 {
-		return nil
+	ops, err := bot.cli.ListPROperationLogs(org, repo, pr.GetNumber())
+	if err != nil {
+		return err
 	}
 
-	org, repo := e.GetOrgRepo()
+	if r := canMerge(pr.GetMergeable(), e.GetPRLabelSet(), cfg, ops); len(r) > 0 {
+		return nil
+	}
 
 	return bot.mergePR(
 		pr.GetNeedReview() || pr.GetNeedTest(),
@@ -84,7 +94,7 @@ func (bot *robot) mergePR(needReviewOrTest bool, org, repo string, number int32,
 	)
 }
 
-func canMerge(mergeable bool, labels sets.String, cfg *botConfig) []string {
+func canMerge(mergeable bool, labels sets.String, cfg *botConfig, ops []sdk.OperateLog) []string {
 	if !mergeable {
 		return []string{msgPRConflicts}
 	}
@@ -118,5 +128,135 @@ func canMerge(mergeable bool, labels sets.String, cfg *botConfig) []string {
 		}
 	}
 
+	// check who add these labels
+	if r := isLabelMatched(labels, cfg, ops); len(r) > 0 {
+		reasons = append(reasons, r...)
+	}
+
 	return reasons
+}
+
+func isLabelMatched(labels sets.String, cfg *botConfig, ops []sdk.OperateLog) []string {
+	var reasons []string
+
+	needs := sets.NewString(approvedLabel)
+	needs.Insert(cfg.LabelsForMerge...)
+
+	if ln := cfg.LgtmCountsRequired; ln == 1 {
+		needs.Insert(lgtmLabel)
+	} else {
+		v := getLGTMLabelsOnPR(labels)
+		if n := uint(len(v)); n < ln {
+			reasons = append(reasons, fmt.Sprintf(msgNotEnoughLGTMLabel, ln, n))
+		}
+	}
+
+	s := checkLabelsLegal(labels, needs, ops, cfg.LegalOperator)
+	if s != "" {
+		reasons = append(reasons, s)
+	}
+
+	if v := needs.Difference(labels); v.Len() > 0 {
+		reasons = append(reasons, fmt.Sprintf(
+			msgMissingLabels, strings.Join(v.UnsortedList(), ", "),
+		))
+	}
+
+	if len(cfg.MissingLabelsForMerge) > 0 {
+		missing := sets.NewString(cfg.MissingLabelsForMerge...)
+		if v := missing.Intersection(labels); v.Len() > 0 {
+			reasons = append(reasons, fmt.Sprintf(
+				msgInvalidLabels, strings.Join(v.UnsortedList(), ", "),
+			))
+		}
+	}
+
+	return reasons
+}
+
+type labelLog struct {
+	label string
+	who   string
+	t     time.Time
+}
+
+func getLatestLog(ops []sdk.OperateLog, label string) (labelLog, bool) {
+	var t time.Time
+
+	index := -1
+
+	for i := range ops {
+		op := &ops[i]
+
+		if op.ActionType != sdk.ActionAddLabel || !strings.Contains(op.Content, label) {
+			continue
+		}
+
+		ut, err := time.Parse(time.RFC3339, op.CreatedAt)
+		if err != nil {
+			// log.Warnf("parse time:%s failed", op.CreatedAt)
+
+			continue
+		}
+
+		if index < 0 || ut.After(t) {
+			t = ut
+			index = i
+		}
+	}
+
+	if index >= 0 {
+		if user := ops[index].User; user != nil && user.Login != "" {
+			return labelLog{
+				label: label,
+				t:     t,
+				who:   user.Login,
+			}, true
+		}
+	}
+
+	return labelLog{}, false
+}
+
+func checkLabelsLegal(labels sets.String, needs sets.String, ops []sdk.OperateLog, legalOperator string) string {
+	f := func(label string) string {
+		v, b := getLatestLog(ops, label)
+		if !b {
+			return fmt.Sprintf("The corresponding operation log is missing. you should delete " +
+				"the label and add it again by correct way")
+		}
+
+		if v.who != legalOperator {
+			if strings.HasPrefix(v.label, "opengauss-cla/") {
+				return fmt.Sprintf("%s You can't add %s by yourself, "+
+					"please remove it and use /check-cla to add it", v.who, v.label)
+			}
+
+			return fmt.Sprintf("%s You can't add %s by yourself, please contact the maintainers", v.who, v.label)
+		}
+
+		return ""
+	}
+
+	v := make([]string, 0, len(labels))
+
+	for label := range labels {
+		if ok := needs.Has(label); ok || strings.HasPrefix(label, lgtmLabel) {
+			if s := f(label); s != "" {
+				v = append(v, fmt.Sprintf("%s: %s", label, s))
+			}
+		}
+	}
+
+	if n := len(v); n > 0 {
+		s := "label is"
+
+		if n > 1 {
+			s = "labels are"
+		}
+
+		return fmt.Sprintf("**The following %s not ready**.\n\n%s", s, strings.Join(v, "\n\n"))
+	}
+
+	return ""
 }
