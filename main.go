@@ -5,12 +5,12 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/opensourceways/community-robot-lib/giteeclient"
-	"github.com/opensourceways/community-robot-lib/logrusutil"
-	liboptions "github.com/opensourceways/community-robot-lib/options"
-	framework "github.com/opensourceways/community-robot-lib/robot-gitee-framework"
-	"github.com/opensourceways/community-robot-lib/secret"
 	cache "github.com/opensourceways/repo-file-cache/sdk"
+	giteeclient "github.com/opensourceways/robot-gitee-lib/client"
+	"github.com/opensourceways/robot-gitee-lib/framework"
+	"github.com/opensourceways/server-common-lib/logrusutil"
+	liboptions "github.com/opensourceways/server-common-lib/options"
+	"github.com/opensourceways/server-common-lib/secret"
 	"github.com/sirupsen/logrus"
 )
 

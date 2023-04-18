@@ -1,5 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
-load("@github_opensourceways_community_robot_lib//:image.bzl", "build_plugin_image", "push_image", "image_tags")
+load("@github_opensourceways_server_common_lib//:image.bzl", "build_plugin_image", "push_image", "image_tags")
+load("@github_opensourceways_robot_gitee_lib//:image.bzl", "build_plugin_image", "push_image", "image_tags")
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
 # gazelle:prefix github.com/opensourceways/robot-gitee-opengauss-review
@@ -31,13 +32,13 @@ go_library(
     importpath = "github.com/opensourceways/robot-gitee-opengauss-review",
     visibility = ["//visibility:private"],
     deps = [
-        "@com_github_opensourceways_community_robot_lib//config:go_default_library",
-        "@com_github_opensourceways_community_robot_lib//giteeclient:go_default_library",
-        "@com_github_opensourceways_community_robot_lib//logrusutil:go_default_library",
-        "@com_github_opensourceways_community_robot_lib//options:go_default_library",
-        "@com_github_opensourceways_community_robot_lib//robot-gitee-framework:go_default_library",
-        "@com_github_opensourceways_community_robot_lib//secret:go_default_library",
-        "@com_github_opensourceways_community_robot_lib//utils:go_default_library",
+        "@com_github_opensourceways_server_common_lib//config:go_default_library",
+        "@com_github_opensourceways_robot_gitee_lib//client:go_default_library",
+        "@com_github_opensourceways_server_common_lib//logrusutil:go_default_library",
+        "@com_github_opensourceways_server_common_lib//options:go_default_library",
+        "@com_github_opensourceways_robot_gitee_lib//framework:go_default_library",
+        "@com_github_opensourceways_server_common_lib//secret:go_default_library",
+        "@com_github_opensourceways_server_common_lib//utils:go_default_library",
         "@com_github_opensourceways_go_gitee//gitee:go_default_library",
         "@com_github_opensourceways_repo_file_cache//models:go_default_library",
         "@com_github_opensourceways_repo_file_cache//sdk:go_default_library",

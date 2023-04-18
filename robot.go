@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/opensourceways/community-robot-lib/config"
-	framework "github.com/opensourceways/community-robot-lib/robot-gitee-framework"
-	"github.com/opensourceways/community-robot-lib/utils"
 	sdk "github.com/opensourceways/go-gitee/gitee"
 	cache "github.com/opensourceways/repo-file-cache/sdk"
+	"github.com/opensourceways/robot-gitee-lib/framework"
+	"github.com/opensourceways/server-common-lib/config"
+	"github.com/opensourceways/server-common-lib/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,7 +54,7 @@ func (bot *robot) getConfig(cfg config.Config, org, repo string) (*botConfig, er
 	return nil, fmt.Errorf("no config for this repo:%s/%s", org, repo)
 }
 
-func (bot *robot) RegisterEventHandler(p framework.HandlerRegitster) {
+func (bot *robot) RegisterEventHandler(p framework.HandlerRegister) {
 	p.RegisterPullRequestHandler(bot.handlePREvent)
 	p.RegisterNoteEventHandler(bot.handleNoteEvent)
 }
